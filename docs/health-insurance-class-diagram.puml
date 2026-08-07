@@ -1,0 +1,243 @@
+@startuml
+title Health Insurance Management System - Class Diagram
+
+left to right direction
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #1F2937
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 42
+skinparam ranksep 56
+skinparam ArrowColor #475569
+skinparam ArrowThickness 1.1
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #F8FAFC
+  BorderColor #334155
+  FontColor #111827
+  HeaderBackgroundColor #E2E8F0
+}
+skinparam enum {
+  BackgroundColor #FFFFFF
+  BorderColor #64748B
+  FontColor #1F2937
+}
+skinparam note {
+  BackgroundColor #FFFBEB
+  BorderColor #D97706
+  FontColor #374151
+}
+
+package "Authentication and Users" as AUTH_USERS #EFF6FF {
+  enum UserRole #DBEAFE {
+    SUBSCRIBER
+    SYSTEM_ADMIN
+    MEDICAL_SERVICE_PROVIDER
+  }
+
+  enum MedicalProviderType #DBEAFE {
+    HOSPITAL
+    CLINIC
+    LABORATORY
+    PHARMACY
+  }
+
+  class User #F8FAFC {
+    - id: String
+    - name: String
+    - email: String
+    - password: String
+    - role: UserRole
+    - phone: String [0..1]
+    - isActive: Boolean
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    --
+    + signIn()
+    + createSubscriberAccount()
+    + createProviderAccount()
+  }
+
+  class MedicalProviderProfile #F8FAFC {
+    - id: String
+    - facilityName: String
+    - providerType: MedicalProviderType
+    - licenseNumber: String
+    - address: String [0..1]
+    - city: String [0..1]
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    --
+    + verifySubscriberEligibility()
+  }
+
+  note bottom of User
+    Conceptual operations map to standalone functions:
+    signInAction(), subscriberSignUpAction(), and
+    providerSignUpAction(); credential verification is
+    implemented by the Auth.js authorize() callback.
+  end note
+
+  note bottom of MedicalProviderProfile
+    verifySubscriberEligibility() maps to
+    checkSubscriberEligibilityAction() and
+    getSubscriberEligibility(); authorization uses UserRole.
+  end note
+}
+
+package "Insurance Management" as INSURANCE #ECFDF5 {
+  enum MedicalServiceCategory #D1FAE5 {
+    LABORATORY
+    PHARMACY
+    EMERGENCY
+    SURGERY
+    DENTAL
+  }
+
+  class InsurancePlan #F8FAFC {
+    - id: String
+    - name: String
+    - code: String
+    - description: String [0..1]
+    - imageUrl: String [0..1]
+    - monthlyPrice: Decimal
+    - durationMonths: Int
+    - maximumAnnualCoverage: Decimal [0..1]
+    - isActive: Boolean
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    --
+    + createPlan()
+    + listPlans()
+  }
+
+  class MedicalService #F8FAFC {
+    - id: String
+    - name: String
+    - code: String
+    - description: String [0..1]
+    - category: MedicalServiceCategory
+    - isActive: Boolean
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    --
+    + listActiveServices()
+  }
+
+  class PlanCoverage #F8FAFC {
+    - id: String
+    - coveragePercentage: Int
+    - annualLimit: Decimal [0..1]
+    - notes: String [0..1]
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    --
+    + defineCoverage()
+    + isReimbursementEligible(): Boolean
+  }
+
+  note bottom of InsurancePlan
+    createPlan() maps to createInsurancePlanAction();
+    listPlans() maps to getInsurancePlans().
+  end note
+
+  note bottom of MedicalService
+    listActiveServices() maps to
+    getActiveMedicalServices().
+  end note
+
+  note bottom of PlanCoverage
+    defineCoverage() is the nested coverage creation in
+    createInsurancePlanAction(). isReimbursementEligible()
+    maps to the coveragePercentage > 0 and < 100 filters in
+    getSubscriberClaimFormData() and
+    createReimbursementRequestAction().
+  end note
+}
+
+package "Subscription Management" as SUBSCRIPTIONS #FFF7ED {
+  class InsuranceSubscription #F8FAFC {
+    - id: String
+    - isActive: Boolean
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    --
+    + activate()
+    + viewActiveCoverage()
+  }
+
+  note bottom of InsuranceSubscription
+    activate() maps to activateInsuranceSubscriptionAction()
+    (upsert and plan assignment for an inactive subscription).
+    viewActiveCoverage() maps to getSubscriberCoverage().
+  end note
+}
+
+package "Reimbursement Management" as REIMBURSEMENTS #FEF2F2 {
+  enum ReimbursementRequestStatus #FEE2E2 {
+    PENDING
+    APPROVED
+    REJECTED
+  }
+
+  class ReimbursementRequest #F8FAFC {
+    - id: String
+    - requestedAmount: Decimal
+    - serviceDate: DateTime
+    - description: String [0..1]
+    - invoiceStorageKey: String
+    - invoiceOriginalName: String
+    - invoiceMimeType: String
+    - invoiceSize: Int
+    - status: ReimbursementRequestStatus
+    - rejectionReason: String [0..1]
+    - createdAt: DateTime
+    - updatedAt: DateTime
+    --
+    + submit()
+    + approve()
+    + reject()
+    + listForSubscriber()
+    + listForReview()
+  }
+
+  note bottom of ReimbursementRequest
+    submit(), approve(), and reject() map to their corresponding
+    ReimbursementRequest Server Actions. The list operations map
+    to getSubscriberReimbursementRequests() and
+    getReimbursementRequestsForReview().
+  end note
+}
+
+' Enum dependencies; roles are modeled by UserRole, not subclasses.
+User ..> UserRole : role
+MedicalProviderProfile ..> MedicalProviderType : provider type
+MedicalService ..> MedicalServiceCategory : category
+ReimbursementRequest ..> ReimbursementRequestStatus : status
+
+' Domain relationships and Prisma-derived multiplicities.
+User "1" *-- "0..1" MedicalProviderProfile : profile
+User "1" -- "0..1" InsuranceSubscription : subscriber
+InsurancePlan "1" -- "0..*" InsuranceSubscription : selected plan
+InsurancePlan "1" *-- "0..*" PlanCoverage : defines
+MedicalService "1" -- "0..*" PlanCoverage : covered service
+InsuranceSubscription "1" -- "0..*" ReimbursementRequest : requests
+PlanCoverage "1" -- "0..*" ReimbursementRequest : claimed coverage
+
+legend bottom
+  |= Notation |= Meaning |
+  | - | Private domain attribute |
+  | + | Public conceptual operation |
+  | solid line | Association |
+  | filled diamond | Composition backed by Prisma cascade ownership |
+  | dashed arrow | Dependency on a Prisma enum |
+  | [0..1] | Optional attribute |
+
+  No hand-written TypeScript domain classes exist in the repository.
+  Operations are conceptual mappings to implemented functions, as noted.
+endlegend
+
+@enduml

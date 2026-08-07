@@ -1,0 +1,155 @@
+@startuml
+' Academic report caption:
+' Figure 16. Entity-Relationship Diagram of the Health Insurance Management System
+
+title Entity-Relationship Diagram of the Health Insurance Management System
+
+top to bottom direction
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 36
+skinparam ranksep 52
+skinparam ArrowColor #374151
+skinparam ArrowThickness 1.2
+skinparam entity {
+  BackgroundColor #F8FAFC
+  BorderColor #334155
+  FontColor #111827
+}
+skinparam note {
+  BackgroundColor #FFFFFF
+  BorderColor #64748B
+  FontColor #111827
+}
+
+hide circle
+
+entity "User" as USER {
+  * id : UUID <<PK>>
+  --
+  * name : String
+  * email : String <<UK>>
+  * password : String
+  * role : UserRole
+  phone : String <<optional>>
+  * isActive : Boolean = true
+  * createdAt : DateTime = now()
+  * updatedAt : DateTime <<auto-updated>>
+}
+
+entity "InsurancePlan" as INSURANCE_PLAN {
+  * id : UUID <<PK>>
+  --
+  * name : String
+  * code : String <<UK>>
+  description : String <<optional>>
+  imageUrl : String <<optional>>
+  * monthlyPrice : Decimal(10,2)
+  * durationMonths : Int
+  maximumAnnualCoverage : Decimal(12,2) <<optional>>
+  * isActive : Boolean = true
+  * createdAt : DateTime = now()
+  * updatedAt : DateTime <<auto-updated>>
+}
+
+entity "MedicalService" as MEDICAL_SERVICE {
+  * id : UUID <<PK>>
+  --
+  * name : String
+  * code : String <<UK>>
+  description : String <<optional>>
+  * category : MedicalServiceCategory
+  * isActive : Boolean = true
+  * createdAt : DateTime = now()
+  * updatedAt : DateTime <<auto-updated>>
+}
+
+entity "MedicalProviderProfile" as MEDICAL_PROVIDER_PROFILE {
+  * id : UUID <<PK>>
+  --
+  * userId : UUID <<FK, UK>>
+  * facilityName : String
+  * providerType : MedicalProviderType
+  * licenseNumber : String <<UK>>
+  address : String <<optional>>
+  city : String <<optional>>
+  * createdAt : DateTime = now()
+  * updatedAt : DateTime <<auto-updated>>
+}
+
+entity "InsuranceSubscription" as INSURANCE_SUBSCRIPTION {
+  * id : UUID <<PK>>
+  --
+  * subscriberId : UUID <<FK, UK>>
+  * planId : UUID <<FK>>
+  * isActive : Boolean = false
+  * createdAt : DateTime = now()
+  * updatedAt : DateTime <<auto-updated>>
+}
+
+entity "PlanCoverage" as PLAN_COVERAGE {
+  * id : UUID <<PK>>
+  --
+  * planId : UUID <<FK, UK1 part>>
+  * serviceId : UUID <<FK, UK1 part>>
+  * coveragePercentage : Int
+  annualLimit : Decimal(12,2) <<optional>>
+  notes : String <<optional>>
+  * createdAt : DateTime = now()
+  * updatedAt : DateTime <<auto-updated>>
+  --
+  UK1 : UNIQUE (planId, serviceId)
+}
+
+entity "ReimbursementRequest" as REIMBURSEMENT_REQUEST {
+  * id : UUID <<PK>>
+  --
+  * subscriptionId : UUID <<FK>>
+  * planCoverageId : UUID <<FK>>
+  * requestedAmount : Decimal(12,2)
+  * serviceDate : DateTime
+  description : String <<optional>>
+  * invoiceStorageKey : String <<UK>>
+  * invoiceOriginalName : String
+  * invoiceMimeType : String
+  * invoiceSize : Int
+  * status : ReimbursementRequestStatus = PENDING
+  * createdAt : DateTime = now()
+  * updatedAt : DateTime <<auto-updated>>
+}
+
+' Mandatory parent at the || end; optional dependent count at the o| or o{ end.
+USER ||--o| MEDICAL_PROVIDER_PROFILE : "profile\nON DELETE CASCADE"
+USER ||--o| INSURANCE_SUBSCRIPTION : "subscriber"
+INSURANCE_PLAN ||--o{ INSURANCE_SUBSCRIPTION : "selected plan"
+INSURANCE_PLAN ||--o{ PLAN_COVERAGE : "coverage records\nON DELETE CASCADE"
+MEDICAL_SERVICE ||--o{ PLAN_COVERAGE : "covered service\nON DELETE CASCADE"
+INSURANCE_SUBSCRIPTION ||--o{ REIMBURSEMENT_REQUEST : "requests\nON DELETE RESTRICT"
+PLAN_COVERAGE ||--o{ REIMBURSEMENT_REQUEST : "claimed coverage\nON DELETE RESTRICT"
+
+' Layout-only links; these do not represent database relationships.
+USER -[hidden]right- INSURANCE_PLAN
+INSURANCE_PLAN -[hidden]right- MEDICAL_SERVICE
+MEDICAL_PROVIDER_PROFILE -[hidden]right- INSURANCE_SUBSCRIPTION
+INSURANCE_SUBSCRIPTION -[hidden]right- PLAN_COVERAGE
+
+legend bottom
+  |= Notation |= Meaning |
+  | PK | Primary key |
+  | FK | Foreign key |
+  | UK | Unique key |
+  | UK1 part | Member of the named composite unique key |
+  | * | Required (non-null) attribute |
+  | optional | Nullable attribute |
+  |= Prisma enum types (not entities) |= Implemented values |
+  | UserRole | SUBSCRIBER; SYSTEM_ADMIN; MEDICAL_SERVICE_PROVIDER |
+  | MedicalProviderType | HOSPITAL; CLINIC; LABORATORY; PHARMACY |
+  | MedicalServiceCategory | LABORATORY; PHARMACY; EMERGENCY; SURGERY; DENTAL |
+  | ReimbursementRequestStatus | PENDING; APPROVED; REJECTED |
+endlegend
+
+@enduml
